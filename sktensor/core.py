@@ -373,7 +373,7 @@ def khatrirao(A, reverse=False):
     for n in range(N):
         ab = A[matorder[0]][:, n]
         for j in range(1, len(matorder)):
-            ab = np.kron(ab, A[matorder[j]][:, n])
+            ab = np.kron(A[matorder[j]][:, n], ab)
         P[:, n] = ab
     return P
 
