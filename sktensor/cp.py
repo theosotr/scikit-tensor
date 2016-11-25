@@ -26,7 +26,7 @@ import numpy as np
 from numpy import array, dot, ones, sqrt
 from scipy.linalg import pinv
 from numpy.random import rand
-from .core import nvecs, norm
+from .core import nvecs, norm, khatrirao
 from .ktensor import ktensor
 
 _log = logging.getLogger('CP')
@@ -169,6 +169,72 @@ def als(X, rank, **kwargs):
             break
 
     return P, fit, itr, array(exectimes)
+
+
+def apr(X, r, M=None, outer_iter=100, inner_iter=10, t=1e-4, k=0.01,
+        k_tol=1e-10, e=1e-10):
+    """
+    Alternating Poisson Regression algorithm to compute the CP decomposition.
+
+    Parameters
+    ----------
+    X : tensor
+        The tensor to be decomposed.
+    r : Number of R components.
+    M : Initial guess for tensor decomposed components.
+    outer_iter : Number of maximum outer iterations.
+    inner_iter : Number of maximum inner iterations.
+    t : Convergence tolerance of KKT conditions.
+    k : Inadmissible zero avoidance adjustment.
+    k_tol : Tolerance of identifying a potentional inadmissible zero.
+    e : Minimum divisor to prevent divide-by-zero.
+
+    Returns
+    -------
+    M : ktensor
+        Rank ``rank`` factorization of X. ``M.U[i]`` corresponds to the factor
+        matrix for the i-th mode. ``M.lambda[i]`` corresponds to the weight
+        of the i-th mode.
+    i : int
+        Number of iterations that were needed until convergence
+    exectimes : ndarray of floats
+        Time needed for each single iteration
+    References
+    ----------
+    .. [1] EC Chi, TG Kolda.
+           On Tensors, Sparsity, and Nonnegative Factorizations.
+           SIAM Journal on Matrix Analysis and Applications, (2012).
+    """
+    N = len(X.shape)
+    if M is None:
+        M = ktensor([np.random.rand(X.shape[i], r) for i in range(N)])
+    phi = np.empty([N, ], dtype=object)
+
+    exectimes = []
+    for i in range(outer_iter):
+        tic = time.clock()
+        is_converged = True
+        for n in range(N):
+            S = np.zeros((X.shape[n], r))
+            if i > 0:
+                S[(phi[n] > 1) & (M.U[n] < k_tol)] = k
+            b = np.dot((M.U[n] + S), np.diag(M.lmbda))
+            pi = khatrirao(tuple(
+                [M.U[i] for i in range(n) + range(n + 1, N)])).transpose()
+            for j in range(inner_iter):
+                phi[n] = np.dot(X.unfold(n) / np.maximum(np.dot(b, pi), e),
+                                pi.transpose())
+                if np.amax(np.abs(np.ravel(np.minimum(M.U[n], 1-phi[n])))) < t:
+                    break
+
+                is_converged = False
+                b *= phi[n]
+            M.lmbda = np.dot(np.ones(b.shape[0]).transpose(), b)
+            M.U[n] = np.dot(b, np.linalg.inv(np.diag(M.lmbda)))
+        exectimes.append(time.clock() - tic)
+        if is_converged:
+            break
+    return M, i, exectimes
 
 
 def opt(X, rank, **kwargs):
