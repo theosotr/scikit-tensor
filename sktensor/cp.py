@@ -38,6 +38,7 @@ _DEF_TYPE = np.float
 
 __all__ = [
     'als',
+    'apr',
     'opt',
     'wopt'
 ]
@@ -220,11 +221,12 @@ def apr(X, r, M=None, outer_iter=100, inner_iter=10, t=1e-4, k=0.01,
                 S[(phi[n] > 1) & (M.U[n] < k_tol)] = k
             b = np.dot((M.U[n] + S), np.diag(M.lmbda))
             pi = khatrirao(tuple(
-                [M.U[i] for i in range(n) + range(n + 1, N)])).transpose()
+                [M.U[i] for i in range(n) + range(n + 1, N)]),
+                reverse=True).transpose()
             for j in range(inner_iter):
                 phi[n] = np.dot(X.unfold(n) / np.maximum(np.dot(b, pi), e),
                                 pi.transpose())
-                if np.amax(np.abs(np.ravel(np.minimum(M.U[n], 1-phi[n])))) < t:
+                if np.amax(np.abs(np.ravel(np.minimum(b, 1-phi[n])))) < t:
                     break
 
                 is_converged = False
