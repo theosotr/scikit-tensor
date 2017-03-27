@@ -71,6 +71,14 @@ def get_version():
     return mod.__version__
 
 
+with open('requirements.txt') as f:
+    INSTALL_REQUIRES = [
+        x.strip('\n')
+        for x in f.readlines()
+        if x and x[0] != '#'
+    ]
+
+
 def setup_package():
 # Call the setup function
     metadata = dict(
@@ -83,11 +91,7 @@ def setup_package():
         download_url=DOWNLOAD_URL,
         long_description=LONG_DESCRIPTION,
         version=get_version(),
-        install_requires=[
-            'numpy',
-            'scipy',
-            'nose'
-        ],
+        install_requires=INSTALL_REQUIRES,
         #test_suite="nose.collector",
         **EXTRA_INFO
     )
